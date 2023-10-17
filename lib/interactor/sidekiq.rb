@@ -37,7 +37,7 @@ module Interactor
       private
 
       def interactor_class(context)
-        Module.const_get context[:interactor_class]
+        Module.const_get context["interactor_class"]
       end
     end
 
@@ -62,7 +62,7 @@ module Interactor
     private
 
     def handle_context_for_sidekiq(context)
-      context.to_h.merge(interactor_class: to_s).to_json
+      context.to_h.merge(interactor_class: to_s)
     end
 
     def handle_sidekiq_options(context)
