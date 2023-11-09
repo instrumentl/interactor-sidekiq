@@ -24,6 +24,17 @@ module Interactor
     class Worker
       include ::Sidekiq::Worker
 
+      sidekiq_retries_exhausted do |job, e|
+        return if jobs['args'].blank? || job['args'].first['interactor_class'].blank?
+
+        interactor_class = job['args'].first['interactor_class'].constantize
+        if interactor_class.respond_to?(:handle_sidekiq_retries_exhausted)
+          interactor_class.handle_sidekiq_retries_exhausted(job, e)
+        else
+          raise e
+        end
+      end
+
       def perform(context)
         interactor_class(context).sync_call(context.reject { |c| ['interactor_class'].include? c.to_s })
       rescue Exception => e
