@@ -25,7 +25,7 @@ module Interactor
       include ::Sidekiq::Worker
 
       sidekiq_retries_exhausted do |job, e|
-        return if jobs['args'].blank? || job['args'].first['interactor_class'].blank?
+        return if job['args'].blank? || job['args'].first['interactor_class'].blank?
 
         interactor_class = job['args'].first['interactor_class'].constantize
         if interactor_class.respond_to?(:handle_sidekiq_retries_exhausted)
