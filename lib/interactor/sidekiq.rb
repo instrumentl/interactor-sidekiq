@@ -21,6 +21,8 @@ module Interactor
   # https://github.com/mperham/sidekiq/blob/4.x/lib/sidekiq/extensions/class_methods.rb
 
   module SidekiqWorker
+    extend ::ActiveSupport::Concern
+
     class Worker
       include ::Sidekiq::Worker
 
@@ -70,14 +72,24 @@ module Interactor
       end
     end
 
+    included do
+      class_attribute :sidekiq_worker_class
+    end
+
+    class_methods do
+      def sidekiq_worker_class(klass)
+        self.custom_sidekiq_worker_class = klass
+      end
+    end
+
     private
 
     def worker_class
-      return Worker unless respond_to?(:sidekiq_worker_class)
+      return Worker if custom_sidekiq_worker_class.nil?
 
-      sidekiq_worker_class.tap do |klass|
+      custom_sidekiq_worker_class.tap do |klass|
         unless klass.is_a?(Worker)
-          raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of Interactor::Sidekiq::Worker."
+          raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of ::Interactor::SidekiqWorker::Worker."
         end
       end
     end

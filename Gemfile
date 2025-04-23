@@ -7,3 +7,4 @@ gemspec
 gem 'bundler'
 gem 'rake'
 gem 'rspec'
+gem 'activesupport'
