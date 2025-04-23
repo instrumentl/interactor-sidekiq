@@ -50,6 +50,16 @@ In order to be able to schedule jobs for future execution following [Scheduled J
 #<Interactor::Context message="hello!", sidekiq_options={ queue: :low_priority }, sidekiq_schedule_options={ perform_in: 5 }>
 ```
 
+### Customising the SidekiqWorker Class
+
+You can declare you own class to use for the `::Sidekiq::Worker`. This is useful when raising errors and categorising queues.
+
+```ruby
+sidekiq_worker_class class MyWorkerClass < ::Interactor::SidekiqWorker::Worker; end
+```
+
+The class must inherit from `::Interactor::SidekiqWorker::Worker`.
+
 ## Failure
 
 If you pass invalid parameters to sidekiq, you will get an immediate return with the error message.
@@ -85,11 +95,11 @@ class AsyncAction
   def self.sidekiq_options
     { queue: :low_priority }
   end
-    
+
   def self.sidekiq_schedule_options
     { perform_in: 5 }
   end
-  
+
   def self.handle_sidekiq_exception(error)
     # Integrate with Application Monitoring and Error Tracking Software
   end
