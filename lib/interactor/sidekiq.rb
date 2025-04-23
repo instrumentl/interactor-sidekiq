@@ -74,9 +74,9 @@ module Interactor
     private
 
     def worker_class
-      return Worker if custom_sidekiq_worker_class.nil?
+      return Worker if !defined?(@custom_sidekiq_worker_class) || @custom_sidekiq_worker_class.nil?
 
-      return custom_sidekiq_worker_class if custom_sidekiq_worker_class < Worker
+      return @custom_sidekiq_worker_class if @custom_sidekiq_worker_class < Worker
 
       raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of ::Interactor::SidekiqWorker::Worker."
     end
@@ -113,14 +113,12 @@ module Interactor
     def self.included(base)
       base.class_eval do
         extend ClassMethods
-
-        class_attribute :custom_sidekiq_worker_class
       end
     end
 
     module ClassMethods
       def sidekiq_worker_class(klass)
-        self.custom_sidekiq_worker_class = klass
+        @custom_sidekiq_worker_class = klass
       end
     end
   end
