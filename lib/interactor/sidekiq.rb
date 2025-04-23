@@ -60,7 +60,7 @@ module Interactor
       options = handle_sidekiq_options(context)
       schedule_options = delay_sidekiq_schedule_options(context)
 
-      Worker.set(options).perform_in(schedule_options.fetch(:delay, 0), handle_context_for_sidekiq(context))
+      worker_class.set(options).perform_in(schedule_options.fetch(:delay, 0), handle_context_for_sidekiq(context))
       new(context.to_h).context
     rescue Exception => e
       begin
@@ -71,6 +71,16 @@ module Interactor
     end
 
     private
+
+    def worker_class
+      return Worker unless respond_to?(:sidekiq_worker_class)
+
+      sidekiq_worker_class.tap do |klass|
+        unless klass.is_a?(Worker)
+          raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of Interactor::Sidekiq::Worker."
+        end
+      end
+    end
 
     def handle_context_for_sidekiq(context)
       context.to_h.merge(interactor_class: to_s)
