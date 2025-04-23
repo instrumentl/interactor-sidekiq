@@ -10,6 +10,7 @@ module Interactor
       extend ClassMethods
       extend SidekiqWorker
       include Hooks
+      include SidekiqWorkerConfiguration
 
       # Public: Gets the Interactor::Context of the Interactor instance.
       attr_reader :context
@@ -21,8 +22,6 @@ module Interactor
   # https://github.com/mperham/sidekiq/blob/4.x/lib/sidekiq/extensions/class_methods.rb
 
   module SidekiqWorker
-    extend ::ActiveSupport::Concern
-
     class Worker
       include ::Sidekiq::Worker
 
@@ -72,26 +71,14 @@ module Interactor
       end
     end
 
-    included do
-      class_attribute :sidekiq_worker_class
-    end
-
-    class_methods do
-      def sidekiq_worker_class(klass)
-        self.custom_sidekiq_worker_class = klass
-      end
-    end
-
     private
 
     def worker_class
       return Worker if custom_sidekiq_worker_class.nil?
 
-      custom_sidekiq_worker_class.tap do |klass|
-        unless klass.is_a?(Worker)
-          raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of ::Interactor::SidekiqWorker::Worker."
-        end
-      end
+      return custom_sidekiq_worker_class if custom_sidekiq_worker_class < Worker
+
+      raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of ::Interactor::SidekiqWorker::Worker."
     end
 
     def handle_context_for_sidekiq(context)
@@ -118,6 +105,22 @@ module Interactor
         respond_to?(:sidekiq_schedule_options) ? sidekiq_schedule_options : { delay: 0 }
       else
         context[:sidekiq_schedule_options]
+      end
+    end
+  end
+
+  module SidekiqWorkerConfiguration
+    def self.included(base)
+      base.class_eval do
+        extend ClassMethods
+
+        class_attribute :custom_sidekiq_worker_class
+      end
+    end
+
+    module ClassMethods
+      def sidekiq_worker_class(klass)
+        self.custom_sidekiq_worker_class = klass
       end
     end
   end
