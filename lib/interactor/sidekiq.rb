@@ -2,6 +2,7 @@
 
 require 'interactor'
 require 'sidekiq'
+require 'active_support/core_ext/hash'
 
 module Interactor
   # Internal: Install Interactor's behavior in the given class.
@@ -36,11 +37,11 @@ module Interactor
         end
       end
 
-      def perform(context)
-        interactor_class(context).sync_call(context.reject { |c| ['interactor_class'].include? c.to_s })
+      def perform(interactor_context)
+        interactor_class(interactor_context).sync_call(interactor_context.reject { |c| ['interactor_class'].include? c.to_s })
       rescue Exception => e
-        if interactor_class(context).respond_to?(:handle_sidekiq_exception)
-          interactor_class(context).handle_sidekiq_exception(e)
+        if interactor_class(interactor_context).respond_to?(:handle_sidekiq_exception)
+          interactor_class(interactor_context).handle_sidekiq_exception(e)
         else
           raise e
         end
@@ -48,24 +49,24 @@ module Interactor
 
       private
 
-      def interactor_class(context)
-        Module.const_get context[:interactor_class]
+      def interactor_class(interactor_context)
+        Module.const_get interactor_context[:interactor_class]
       end
     end
 
-    def sync_call(context = {})
-      new(context).tap(&:run!).context
+    def sync_call(interactor_context = {})
+      new(interactor_context).tap(&:run!).context
     end
 
-    def async_call(context = {})
-      options = handle_sidekiq_options(context)
-      schedule_options = delay_sidekiq_schedule_options(context)
+    def async_call(interactor_context = {})
+      options = handle_sidekiq_options(interactor_context)
+      schedule_options = delay_sidekiq_schedule_options(interactor_context)
 
-      worker_class.set(options).perform_in(schedule_options.fetch(:delay, 0), handle_context_for_sidekiq(context))
-      new(context.to_h).context
+      worker_class.set(options).perform_in(schedule_options.fetch(:delay, 0), handle_context_for_sidekiq(interactor_context))
+      new(interactor_context.to_h).context
     rescue Exception => e
       begin
-        new(context.to_h).context.fail!(error: e.message)
+        new(interactor_context.to_h).context.fail!(error: e.message)
       rescue Failure => e
         e.context
       end
@@ -81,30 +82,30 @@ module Interactor
       raise "#{klass} is not a valid Sidekiq worker class. It must be a subclass of ::Interactor::SidekiqWorker::Worker."
     end
 
-    def handle_context_for_sidekiq(context)
-      context.to_h.merge(interactor_class: to_s)
+    def handle_context_for_sidekiq(interactor_context)
+      interactor_context.to_h.merge(interactor_class: to_s).except(:sidekiq_options).except(:sidekiq_schedule_options).stringify_keys
     end
 
-    def handle_sidekiq_options(context)
-      if context[:sidekiq_options].nil?
+    def handle_sidekiq_options(interactor_context)
+      if interactor_context[:sidekiq_options].nil?
         respond_to?(:sidekiq_options) ? sidekiq_options : { queue: :default }
       else
-        context[:sidekiq_options]
+        interactor_context[:sidekiq_options]
       end
     end
 
-    def delay_sidekiq_schedule_options(context)
-      options = handle_sidekiq_schedule_options(context)
+    def delay_sidekiq_schedule_options(interactor_context)
+      options = handle_sidekiq_schedule_options(interactor_context)
       return {} unless options.key?(:perform_in) || options.key?(:perform_at)
 
       { delay: options[:perform_in] || options[:perform_at] }
     end
 
-    def handle_sidekiq_schedule_options(context)
-      if context[:sidekiq_schedule_options].nil?
+    def handle_sidekiq_schedule_options(interactor_context)
+      if interactor_context[:sidekiq_schedule_options].nil?
         respond_to?(:sidekiq_schedule_options) ? sidekiq_schedule_options : { delay: 0 }
       else
-        context[:sidekiq_schedule_options]
+        interactor_context[:sidekiq_schedule_options]
       end
     end
   end
@@ -133,18 +134,18 @@ module Interactor
     end
 
     module ClassMethods
-      def call(context = {})
-        default_async_call(context)
+      def call(interactor_context = {})
+        default_async_call(interactor_context)
       end
 
-      def call!(context = {})
-        default_async_call(context)
+      def call!(interactor_context = {})
+        default_async_call(interactor_context)
       end
 
       private
 
-      def default_async_call(context)
-        async_call(context)
+      def default_async_call(interactor_context)
+        async_call(interactor_context)
       end
     end
   end

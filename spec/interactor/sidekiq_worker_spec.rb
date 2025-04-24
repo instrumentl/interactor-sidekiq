@@ -89,7 +89,11 @@ RSpec.describe Interactor::SidekiqWorker do
 
     it { expect(jobs_by_queue['queue']).to eq elements[:sidekiq_options][:queue] }
 
-    it { expect(jobs_by_queue['args']).to eq [context.merge(interactor_class: elements[:interactor_class]).to_json] }
+    it "is queued with the correct arguments" do
+      expect(jobs_by_queue['args']).to eq(
+        [context.merge(interactor_class: elements[:interactor_class]).except(:sidekiq_options).except(:sidekiq_schedule_options).stringify_keys]
+      )
+    end
   end
 
   shared_examples_for 'there is no sidekiq worker' do
@@ -140,8 +144,10 @@ RSpec.describe Interactor::SidekiqWorker do
             { key: 'value', sidekiq_options: { queue: 'low_priority' }, sidekiq_schedule_options: { perform_in: 5 } }
           end
 
-          it_behaves_like 'sidekiq worker', interactor_class: interactor_class, sidekiq_options: { queue: 'low_priority' },
-                                            sidekiq_schedule_options: { perform_in: 5 }
+          it_behaves_like 'sidekiq worker',
+            interactor_class: interactor_class,
+            sidekiq_options: { queue: 'low_priority' },
+            sidekiq_schedule_options: { perform_in: 5 }
 
           it_behaves_like 'interactor success'
         end
