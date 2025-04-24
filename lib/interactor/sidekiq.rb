@@ -49,7 +49,7 @@ module Interactor
       private
 
       def interactor_class(context)
-        Module.const_get context["interactor_class"]
+        Module.const_get context[:interactor_class]
       end
     end
 
