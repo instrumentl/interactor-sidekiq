@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require 'interactor'
-require 'sidekiq'
-require 'active_support/core_ext/hash'
+require "interactor"
+require "sidekiq"
+require "active_support/core_ext/hash"
 
 module Interactor
   # Internal: Install Interactor's behavior in the given class.
@@ -27,10 +27,11 @@ module Interactor
       include ::Sidekiq::Worker
 
       sidekiq_retries_exhausted do |job, e|
-        return if job['args'].blank? || job['args'].first['interactor_class'].blank?
+        interactor_class = job.with_indifferent_access.dig(:args, 0, :interactor_class)&.constantize
 
-        interactor_class = job['args'].first['interactor_class'].constantize
-        if interactor_class.respond_to?(:handle_sidekiq_retries_exhausted)
+        if interactor_class.nil?
+          return
+        elsif interactor_class.respond_to?(:handle_sidekiq_retries_exhausted)
           interactor_class.handle_sidekiq_retries_exhausted(job, e)
         else
           raise e
@@ -38,7 +39,14 @@ module Interactor
       end
 
       def perform(interactor_context)
-        interactor_class(interactor_context).sync_call(interactor_context.reject { |c| ['interactor_class'].include? c.to_s })
+        # could be an interactor context object
+        interactor_context = if interactor_context.respond_to?(:symbolize_keys)
+          interactor_context.symbolize_keys
+       else
+         interactor_context
+       end
+
+        interactor_class(interactor_context).sync_call(interactor_context.reject { ["interactor_class"].include?(_1.to_s) })
       rescue Exception => e
         if interactor_class(interactor_context).respond_to?(:handle_sidekiq_exception)
           interactor_class(interactor_context).handle_sidekiq_exception(e)
@@ -50,7 +58,7 @@ module Interactor
       private
 
       def interactor_class(interactor_context)
-        Module.const_get interactor_context[:interactor_class]
+        @interactor_context ||= Module.const_get interactor_context[:interactor_class]
       end
     end
 
@@ -59,6 +67,13 @@ module Interactor
     end
 
     def async_call(interactor_context = {})
+      # could be an interactor context object
+      interactor_context = if interactor_context.respond_to?(:symbolize_keys)
+         interactor_context.symbolize_keys
+      else
+        interactor_context
+      end
+
       options = handle_sidekiq_options(interactor_context)
       schedule_options = delay_sidekiq_schedule_options(interactor_context)
 
